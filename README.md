@@ -8,7 +8,7 @@ Smart Attendance System is a modern web-based solution designed to digitize and 
 
 ## Tech Stack
 
-### Frontend
+### Frontend...
 - React.js with TypeScript
 - Tailwind CSS for styling
 - React Router for navigation
