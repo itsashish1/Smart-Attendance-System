@@ -20,12 +20,11 @@ import {
   TablePagination
 } from '@mui/material';
 import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon, Search as SearchIcon } from '@mui/icons-material';
-import { useAuth } from '../context/AuthContext';
+import axios from 'axios';
 
 const API_URL = 'http://localhost:5000/api';
 
 function Students() {
-  const { isAuthenticated } = useAuth();
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -48,17 +47,11 @@ function Students() {
 
   const fetchStudents = async () => {
     try {
-      const res = await fetch(`${API_URL}/students`, {
-        headers: { 'Content-Type': 'application/json' }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setStudents(data);
-      } else {
-        setStudents([]);
-      }
+      const res = await axios.get(`${API_URL}/students`);
+      setStudents(res.data);
     } catch (err) {
       console.error('Error fetching students:', err);
+      setStudents([]);
     } finally {
       setLoading(false);
     }
@@ -83,40 +76,30 @@ function Students() {
   const handleCloseDialog = () => {
     setOpenDialog(false);
     setEditingStudent(null);
+    setError('');
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     try {
-      const url = editingStudent
-        ? `${API_URL}/students/${editingStudent._id}`
-        : `${API_URL}/students`;
-      const method = editingStudent ? 'PUT' : 'POST';
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
-      });
-      if (res.ok) {
-        await fetchStudents();
-        handleCloseDialog();
+      if (editingStudent) {
+        await axios.put(`${API_URL}/students/${editingStudent._id}`, formData);
       } else {
-        const errData = await res.json();
-        setError(errData.message || 'Failed to save student');
+        await axios.post(`${API_URL}/students`, formData);
       }
+      await fetchStudents();
+      handleCloseDialog();
     } catch (err) {
-      setError('An error occurred');
+      setError(err.response?.data?.message || 'Failed to save student');
     }
   };
 
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this student?')) {
       try {
-        const res = await fetch(`${API_URL}/students/${id}`, { method: 'DELETE' });
-        if (res.ok) {
-          await fetchStudents();
-        }
+        await axios.delete(`${API_URL}/students/${id}`);
+        await fetchStudents();
       } catch (err) {
         console.error('Error deleting student:', err);
       }
@@ -127,7 +110,7 @@ function Students() {
     (s) =>
       s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       s.rollNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      s.department.toLowerCase().includes(searchTerm.toLowerCase())
+      (s.department || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const paginatedStudents = filteredStudents.slice(
@@ -226,6 +209,7 @@ function Students() {
         <DialogTitle>{editingStudent ? 'Edit Student' : 'Add New Student'}</DialogTitle>
         <form onSubmit={handleSubmit}>
           <DialogContent>
+            {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
             <TextField
               fullWidth
               label="Name"
