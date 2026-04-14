@@ -15,6 +15,10 @@ const AttendanceSchema = new mongoose.Schema({
     type: Date,
     default: Date.now
   },
+  class: {
+    type: String,
+    default: ''
+  },
   remarks: {
     type: String,
     default: ''
