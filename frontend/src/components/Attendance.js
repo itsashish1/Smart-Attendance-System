@@ -11,7 +11,6 @@ import {
   TableRow,
   Button,
   TextField,
-  IconButton,
   Chip,
   Alert,
   FormControl,
@@ -22,17 +21,15 @@ import {
   CircularProgress
 } from '@mui/material';
 import { CheckCircle as CheckCircleIcon, Cancel as CancelIcon, Refresh as RefreshIcon } from '@mui/icons-material';
-import { useAuth } from '../context/AuthContext';
+import axios from 'axios';
 
 const API_URL = 'http://localhost:5000/api';
 
 function Attendance() {
-  const { isAuthenticated } = useAuth();
   const [students, setStudents] = useState([]);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedClass, setSelectedClass] = useState('');
   const [attendance, setAttendance] = useState({});
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -42,13 +39,8 @@ function Attendance() {
 
   const fetchStudents = async () => {
     try {
-      const res = await fetch(`${API_URL}/students`, {
-        headers: { 'Content-Type': 'application/json' }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setStudents(data);
-      }
+      const res = await axios.get(`${API_URL}/students`);
+      setStudents(res.data);
     } catch (err) {
       console.error('Error fetching students:', err);
     }
@@ -72,22 +64,11 @@ function Attendance() {
         status
       }));
 
-      const res = await fetch(`${API_URL}/attendance/bulk`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ records })
-      });
-
-      if (res.ok) {
-        setError('');
-        setAttendance({});
-        alert('Attendance marked successfully!');
-      } else {
-        const errData = await res.json();
-        setError(errData.message || 'Failed to mark attendance');
-      }
+      await axios.post(`${API_URL}/attendance/bulk`, { records });
+      setAttendance({});
+      alert('Attendance marked successfully!');
     } catch (err) {
-      setError('An error occurred while marking attendance');
+      setError(err.response?.data?.message || 'Failed to mark attendance');
     } finally {
       setSubmitting(false);
     }
@@ -95,14 +76,10 @@ function Attendance() {
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'present':
-        return 'success';
-      case 'absent':
-        return 'error';
-      case 'late':
-        return 'warning';
-      default:
-        return 'default';
+      case 'present': return 'success';
+      case 'absent': return 'error';
+      case 'late': return 'warning';
+      default: return 'default';
     }
   };
 
@@ -182,9 +159,7 @@ function Attendance() {
                           key={status}
                           label={status.charAt(0).toUpperCase() + status.slice(1)}
                           color={getStatusColor(status)}
-                          variant={
-                            attendance[student._id] === status ? 'filled' : 'outlined'
-                          }
+                          variant={attendance[student._id] === status ? 'filled' : 'outlined'}
                           onClick={() => handleAttendanceChange(student._id, status)}
                           icon={
                             status === 'present'
@@ -199,6 +174,13 @@ function Attendance() {
                   </TableCell>
                 </TableRow>
               ))}
+              {students.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={4} align="center">
+                    No students found. Add students first.
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </TableContainer>

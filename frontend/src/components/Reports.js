@@ -20,15 +20,14 @@ import {
   CircularProgress,
   Card,
   CardContent,
-  Divider
+  Chip
 } from '@mui/material';
-import { useAuth } from '../context/AuthContext';
+import axios from 'axios';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 
 const API_URL = 'http://localhost:5000/api';
 
 function Reports() {
-  const { isAuthenticated } = useAuth();
   const [students, setStudents] = useState([]);
   const [attendanceRecords, setAttendanceRecords] = useState([]);
   const [selectedStudent, setSelectedStudent] = useState('');
@@ -44,13 +43,8 @@ function Reports() {
 
   const fetchStudents = async () => {
     try {
-      const res = await fetch(`${API_URL}/students`, {
-        headers: { 'Content-Type': 'application/json' }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setStudents(data);
-      }
+      const res = await axios.get(`${API_URL}/students`);
+      setStudents(res.data);
     } catch (err) {
       console.error('Error fetching students:', err);
     }
@@ -60,21 +54,16 @@ function Reports() {
     setLoading(true);
     setError('');
     try {
-      const params = new URLSearchParams();
-      if (selectedStudent) params.append('studentId', selectedStudent);
-      if (startDate) params.append('startDate', startDate);
-      if (endDate) params.append('endDate', endDate);
+      const params = {};
+      if (selectedStudent) params.studentId = selectedStudent;
+      if (startDate) params.startDate = startDate;
+      if (endDate) params.endDate = endDate;
 
-      const res = await fetch(`${API_URL}/attendance?${params}`);
-      if (res.ok) {
-        const data = await res.json();
-        setAttendanceRecords(data);
-        generateReport(data);
-      } else {
-        setError('Failed to fetch attendance records');
-      }
+      const res = await axios.get(`${API_URL}/attendance`, { params });
+      setAttendanceRecords(res.data);
+      generateReport(res.data);
     } catch (err) {
-      setError('An error occurred while fetching records');
+      setError(err.response?.data?.message || 'Failed to fetch attendance records');
     } finally {
       setLoading(false);
     }
@@ -98,6 +87,15 @@ function Reports() {
         { name: 'Late', value: late, color: '#ff9800' }
       ]
     });
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'present': return 'success';
+      case 'absent': return 'error';
+      case 'late': return 'warning';
+      default: return 'default';
+    }
   };
 
   return (
@@ -172,9 +170,7 @@ function Reports() {
             <Grid item xs={12} sm={3}>
               <Card>
                 <CardContent>
-                  <Typography color="text.secondary" gutterBottom>
-                    Total Records
-                  </Typography>
+                  <Typography color="text.secondary" gutterBottom>Total Records</Typography>
                   <Typography variant="h4">{reportData.total}</Typography>
                 </CardContent>
               </Card>
@@ -182,68 +178,56 @@ function Reports() {
             <Grid item xs={12} sm={3}>
               <Card>
                 <CardContent>
-                  <Typography color="text.secondary" gutterBottom>
-                    Present
-                  </Typography>
-                  <Typography variant="h4" color="success.main">
-                    {reportData.present}
-                  </Typography>
+                  <Typography color="text.secondary" gutterBottom>Present</Typography>
+                  <Typography variant="h4" color="success.main">{reportData.present}</Typography>
                 </CardContent>
               </Card>
             </Grid>
             <Grid item xs={12} sm={3}>
               <Card>
                 <CardContent>
-                  <Typography color="text.secondary" gutterBottom>
-                    Absent
-                  </Typography>
-                  <Typography variant="h4" color="error.main">
-                    {reportData.absent}
-                  </Typography>
+                  <Typography color="text.secondary" gutterBottom>Absent</Typography>
+                  <Typography variant="h4" color="error.main">{reportData.absent}</Typography>
                 </CardContent>
               </Card>
             </Grid>
             <Grid item xs={12} sm={3}>
               <Card>
                 <CardContent>
-                  <Typography color="text.secondary" gutterBottom>
-                    Attendance Rate
-                  </Typography>
-                  <Typography variant="h4" color="primary.main">
-                    {reportData.attendanceRate}%
-                  </Typography>
+                  <Typography color="text.secondary" gutterBottom>Attendance Rate</Typography>
+                  <Typography variant="h4" color="primary.main">{reportData.attendanceRate}%</Typography>
                 </CardContent>
               </Card>
             </Grid>
           </Grid>
 
-          <Paper sx={{ p: 3, mb: 3 }}>
-            <Typography variant="h6" gutterBottom>
-              Attendance Distribution
-            </Typography>
-            <Box sx={{ height: 300 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={reportData.chartData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={100}
-                    paddingAngle={5}
-                    dataKey="value"
-                    label={({ name, value }) => `${name}: ${value}`}
-                  >
-                    {reportData.chartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            </Box>
-          </Paper>
+          {reportData.total > 0 && (
+            <Paper sx={{ p: 3, mb: 3 }}>
+              <Typography variant="h6" gutterBottom>Attendance Distribution</Typography>
+              <Box sx={{ height: 300 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={reportData.chartData.filter(d => d.value > 0)}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={100}
+                      paddingAngle={5}
+                      dataKey="value"
+                      label={({ name, value }) => `${name}: ${value}`}
+                    >
+                      {reportData.chartData.filter(d => d.value > 0).map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </Box>
+            </Paper>
+          )}
 
           <Paper>
             <TableContainer>
@@ -252,6 +236,7 @@ function Reports() {
                   <TableRow>
                     <TableCell>Date</TableCell>
                     <TableCell>Student</TableCell>
+                    <TableCell>Roll Number</TableCell>
                     <TableCell>Class</TableCell>
                     <TableCell>Status</TableCell>
                   </TableRow>
@@ -259,27 +244,24 @@ function Reports() {
                 <TableBody>
                   {attendanceRecords.map((record) => (
                     <TableRow key={record._id}>
-                      <TableCell>
-                        {new Date(record.date).toLocaleDateString()}
-                      </TableCell>
+                      <TableCell>{new Date(record.date).toLocaleDateString()}</TableCell>
                       <TableCell>{record.student?.name || 'N/A'}</TableCell>
-                      <TableCell>{record.class || 'N/A'}</TableCell>
+                      <TableCell>{record.student?.rollNumber || 'N/A'}</TableCell>
+                      <TableCell>{record.class || '—'}</TableCell>
                       <TableCell>
-                        <Typography
-                          color={
-                            record.status === 'present'
-                              ? 'success.main'
-                              : record.status === 'absent'
-                              ? 'error.main'
-                              : 'warning.main'
-                          }
-                          fontWeight="bold"
-                        >
-                          {record.status?.toUpperCase()}
-                        </Typography>
+                        <Chip
+                          label={record.status?.toUpperCase()}
+                          color={getStatusColor(record.status)}
+                          size="small"
+                        />
                       </TableCell>
                     </TableRow>
                   ))}
+                  {attendanceRecords.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={5} align="center">No records found</TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
             </TableContainer>

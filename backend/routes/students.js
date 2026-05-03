@@ -28,11 +28,14 @@ router.get('/', auth, async (req, res) => {
 // Add student
 router.post('/', auth, async (req, res) => {
   try {
-    const { name, rollNumber, branch, semester, email } = req.body;
-    const student = new Student({ name, rollNumber, branch, semester, email });
+    const { name, rollNumber, department, email, phone } = req.body;
+    const student = new Student({ name, rollNumber, department, email, phone });
     await student.save();
     res.json(student);
   } catch (err) {
+    if (err.code === 11000) {
+      return res.status(400).json({ message: 'Student with this roll number or email already exists' });
+    }
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -51,8 +54,31 @@ router.get('/:id', auth, async (req, res) => {
 // Update student
 router.put('/:id', auth, async (req, res) => {
   try {
-    const student = await Student.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const { name, rollNumber, department, email, phone } = req.body;
+    const updates = {};
+    if (name !== undefined) updates.name = name;
+    if (rollNumber !== undefined) updates.rollNumber = rollNumber;
+    if (department !== undefined) updates.department = department;
+    if (email !== undefined) updates.email = email;
+    if (phone !== undefined) updates.phone = phone;
+
+    const student = await Student.findByIdAndUpdate(req.params.id, updates, { new: true, runValidators: true });
+    if (!student) return res.status(404).json({ message: 'Student not found' });
     res.json(student);
+  } catch (err) {
+    if (err.code === 11000) {
+      return res.status(400).json({ message: 'Student with this roll number or email already exists' });
+    }
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Delete student
+router.delete('/:id', auth, async (req, res) => {
+  try {
+    const student = await Student.findByIdAndDelete(req.params.id);
+    if (!student) return res.status(404).json({ message: 'Student not found' });
+    res.json({ message: 'Student deleted successfully' });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
   }
