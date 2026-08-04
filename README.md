@@ -1,4 +1,4 @@
-1# Smart Attendance System for COllages
+...1# Smart Attendance System for COllages
 
 > A full-stack web application for automated college attendance management with real-time tracking, analytics, and reporting.
 
